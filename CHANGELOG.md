@@ -4,7 +4,9 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/)
 (see [docs/versioning.md](docs/versioning.md)).
 
-## [0.1.0] - Unreleased
+## [Unreleased]
+
+## [0.1.0] - 2026-11-27
 
 Initial MVP.
 
@@ -20,3 +22,6 @@ Initial MVP.
 - Log and error-text redaction.
 - `IDeliveryStore` persistence interface, `InMemoryDeliveryStore`, and the `JspIt.WebhookDelivery.Sqlite` reference store.
 - Runnable sample, architecture/security/semantics/interfaces/versioning documentation, CI.
+
+[Unreleased]: https://github.com/JSP-IT/webhook-delivery-kit/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/JSP-IT/webhook-delivery-kit/releases/tag/v0.1.0
