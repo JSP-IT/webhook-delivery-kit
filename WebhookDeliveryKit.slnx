@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/JspIt.WebhookDelivery.Sample/JspIt.WebhookDelivery.Sample.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/JspIt.WebhookDelivery.Sqlite/JspIt.WebhookDelivery.Sqlite.csproj" />
+    <Project Path="src/JspIt.WebhookDelivery/JspIt.WebhookDelivery.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/JspIt.WebhookDelivery.Tests/JspIt.WebhookDelivery.Tests.csproj" />
+  </Folder>
+</Solution>

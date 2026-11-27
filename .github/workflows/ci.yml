@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "release/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+# Build and verification only. This workflow never publishes packages or deploys anything.
+jobs:
+  build-and-test:
+    name: Build and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - run: dotnet restore WebhookDeliveryKit.slnx
+      - run: dotnet build WebhookDeliveryKit.slnx --configuration Release --no-restore
+      - run: dotnet test --solution WebhookDeliveryKit.slnx --configuration Release --no-build
+      - name: Run sample end to end
+        run: dotnet run --project samples/JspIt.WebhookDelivery.Sample --configuration Release --no-build
+
+  package:
+    name: Pack and audit
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - run: dotnet restore WebhookDeliveryKit.slnx
+
+      - name: Fail on vulnerable packages (including transitive)
+        shell: bash
+        run: |
+          dotnet list WebhookDeliveryKit.slnx package --vulnerable --include-transitive | tee vulnerable.txt
+          if grep -q "has the following vulnerable packages" vulnerable.txt; then
+            echo "::error::Vulnerable packages found."
+            exit 1
+          fi
+
+      - name: Pack (with package validation)
+        shell: bash
+        run: |
+          dotnet pack src/JspIt.WebhookDelivery --configuration Release --no-restore --output artifacts
+          dotnet pack src/JspIt.WebhookDelivery.Sqlite --configuration Release --no-restore --output artifacts
+
+      - name: Check package metadata
+        shell: bash
+        run: |
+          version=$(dotnet msbuild src/JspIt.WebhookDelivery -getProperty:Version)
+          for id in JspIt.WebhookDelivery JspIt.WebhookDelivery.Sqlite; do
+            pkg="artifacts/$id.$version.nupkg"
+            test -f "$pkg" || { echo "::error::Missing $pkg"; exit 1; }
+            test -f "artifacts/$id.$version.snupkg" || { echo "::error::Missing symbols for $id"; exit 1; }
+            nuspec=$(unzip -p "$pkg" "$id.nuspec")
+            echo "$nuspec" | grep -q '<license type="expression">Apache-2.0</license>' || { echo "::error::$id license metadata"; exit 1; }
+            echo "$nuspec" | grep -q '<readme>README.md</readme>' || { echo "::error::$id readme metadata"; exit 1; }
+            echo "$nuspec" | grep -q '<repository type="git" url="https://github.com/JSP-IT/webhook-delivery-kit"' || { echo "::error::$id repository metadata"; exit 1; }
+            unzip -l "$pkg" | grep -q " NOTICE$" || { echo "::error::$id is missing NOTICE"; exit 1; }
+          done
+          test -f ".github/release-notes-v$version.md" || { echo "::error::Release notes for v$version missing"; exit 1; }
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nupkg
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 14
